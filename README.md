@@ -1,6 +1,6 @@
 # LISA - AI-Powered Robot Navigation & Safety Assistant
 
-LISA (Location-Intelligent Safety Assistant) is an AI-powered assistant that runs on quadruped robots (Unitree Go2) to provide autonomous navigation, visual inspection, and safety monitoring capabilities for construction sites and industrial environments.
+LISA (Local Intelligent Safety Assistant) is an AI-powered assistant that runs on quadruped robots (Unitree Go2W) to provide autonomous navigation, visual inspection, and safety monitoring capabilities for construction sites and industrial environments.
 
 ## Features
 
