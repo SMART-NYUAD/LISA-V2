@@ -1,0 +1,8 @@
+cyclonedds
+ollama
+pydub
+piper-tts
+openai-whisper
+sounddevice
+numpy
+scipy

@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+ENV/
+lisa_demo/
+
+# Audio files (except cue sounds in audio/ directory)
+*.wav
+!audio/start_cue.wav
+!audio/stop_cue.wav
+
+# Log files
+logs/api/*.txt
+logs/api/*/
+logs/local/*.txt
+logs/local/*/
+*.log
+
+# Temporary files
+tmp/*
+!tmp/.gitkeep
+
+# Experiment counter files
+.exp_counter_*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ROS
+.ros/
+
+# TTS Models (too large for git)
+TTS_models/*.onnx
+TTS_models/*.onnx.json
+!TTS_models/README.md
+
+# Keep directory structure
+!.gitkeep
+
