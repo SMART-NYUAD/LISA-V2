@@ -47,10 +47,11 @@ LISA (Local Intelligent Safety Assistant) is an AI-powered assistant that runs o
 ### Prerequisites
 
 - Linux OS (tested on Ubuntu 20.04+)
-- Python 3.8+
-- ROS 2 (Humble or later)
-- Unitree Go2 robot with SDK
-- Ollama (local or remote access)
+- Python 3.8+ (system) and Python 3.11 (LISA venv)
+- ROS2 (tested on Foxy)
+- Unitree SDK
+- CycloneDDS
+- Ollama (if using local inference)
 
 ### Installation
 
@@ -60,22 +61,35 @@ LISA (Local Intelligent Safety Assistant) is an AI-powered assistant that runs o
    cd LISA_v3_nav_clean
    ```
 
-2. **Install Python dependencies**
+2. **Create a Python 3.11 virtual environment**
+   ```bash
+   python3.11 -m venv venv
+   source venv/bin/activate
+   ```
+
+3. **Set up CycloneDDS environment variable**
+   ```bash
+   export CYCLONEDDS_HOME="/path/to/cyclonedds/install"
+   ```
+   (Adjust the path to match your CycloneDDS installation location)
+
+4. **Install Python dependencies**
    ```bash
    pip install -r requirements.txt
    ```
 
-3. **Set up environment variables** (optional)
+5. **Set up environment variables** (optional)
    ```bash
    export UNITREE_SDK_PATH="/path/to/unitree_sdk2_python"
    export LISA_CHAT_MODEL="gemma3:27b"
    export LISA_VISION_MODEL="gemma3:27b"
    ```
+(Adjust the path to match your Unitree SDK installation location)
 
-4. **Download TTS models** (Required for speech)
+6. **Download TTS models** (Required for speech)
    See `TTS_models/README.md` for download instructions.
 
-5. **Configure navigation waypoints**
+7. **Configure navigation waypoints**
    Edit `src/ros_functions.py` to set your custom waypoint coordinates.
 
 ### Running LISA
