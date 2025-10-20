@@ -36,6 +36,7 @@ import base64
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
+from config import config
 from robot_functions import robot_take_pic, robot_speak, preload_tts_model
 from ros_functions import (
     navigate_to, 
@@ -44,8 +45,8 @@ from ros_functions import (
 )
  
 
-# Enable speech
-ENABLE_SPEECH = True
+# Enable speech (from config)
+ENABLE_SPEECH = config.ENABLE_SPEECH
 
 def setup_terminal_log(log_dir: str) -> str:
     """Tee stdout/stderr to a timestamped log file in the given directory."""
@@ -72,13 +73,13 @@ def setup_terminal_log(log_dir: str) -> str:
     print(f"Logging terminal output to: {log_path}")
     return log_path
 
-# Ollama API configuration
-OLLAMA_API_BASE = "http://192.168.50.103:11434"
-OLLAMA_CHAT_ENDPOINT = f"{OLLAMA_API_BASE}/api/chat"
+# Ollama API configuration (from config)
+OLLAMA_API_BASE = config.OLLAMA_API_BASE
+OLLAMA_CHAT_ENDPOINT = config.OLLAMA_CHAT_ENDPOINT
 
-# Models
-DEFAULT_CHAT_MODEL = os.environ.get("LISA_CHAT_MODEL", "gemma3:27b")
-DEFAULT_VISION_MODEL = os.environ.get("LISA_VISION_MODEL", "gemma3:27b")
+# Models (from config)
+DEFAULT_CHAT_MODEL = config.CHAT_MODEL
+DEFAULT_VISION_MODEL = config.VISION_MODEL
 
 # Path to last captured image (relative to script directory)
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))

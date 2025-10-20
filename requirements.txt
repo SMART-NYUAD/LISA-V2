@@ -7,3 +7,4 @@ sounddevice==0.5.2
 numpy==2.3.4
 scipy==1.16.2
 evdev==1.9.2
+python-dotenv==1.0.0

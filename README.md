@@ -67,32 +67,56 @@ LISA (Local Intelligent Safety Assistant) is an AI-powered assistant that runs o
    source venv/bin/activate
    ```
 
-3. **Set up CycloneDDS environment variable**
-   ```bash
-   export CYCLONEDDS_HOME="/path/to/cyclonedds/install"
-   ```
-   (Adjust the path to match your CycloneDDS installation location)
-
-4. **Install Python dependencies**
+3. **Install Python dependencies**
    ```bash
    pip install -r requirements.txt
    ```
 
-5. **Set up environment variables** (optional)
+4. **Configure environment variables**
+   
+   **Option A: Using config.env (Quick Start)**
    ```bash
-   export UNITREE_SDK_PATH="/path/to/unitree_sdk2_python"
-   export LISA_CHAT_MODEL="gemma3:27b"
-   export LISA_VISION_MODEL="gemma3:27b"
+   # Edit config.env to match your setup
+   nano config.env
+   
+   # Source it before running LISA
+   source config.env
    ```
-(Adjust the path to match your Unitree SDK installation location)
+   
+   **Option B: Using .env file (Recommended for Production)**
+   ```bash
+   # Copy template and edit
+   cp config.env .env
+   nano .env
+   # Remove 'export' keywords from each line
+   
+   # The .env file is automatically loaded by LISA
+   ```
+   
+   Key settings to configure:
+   - `UNITREE_SDK_PATH` - Path to Unitree SDK
+   - `CYCLONEDDS_HOME` - Path to CycloneDDS installation
+   - `OLLAMA_API_BASE` - Ollama API endpoint
+   - `LISA_CHAT_MODEL` - Chat model name
+   - `LISA_VISION_MODEL` - Vision model name
+   
+   See [CONFIG.md](CONFIG.md) for complete configuration guide.
 
-6. **Download TTS models** (Required for speech)
+5. **Download TTS models** (Required for speech)
    See `TTS_models/README.md` for download instructions.
 
-7. **Configure navigation waypoints**
+6. **Configure navigation waypoints**
    Edit `src/ros_functions.py` to set your custom waypoint coordinates.
 
 ### Running LISA
+
+**First, configure the environment:**
+```bash
+# Source the configuration (contains all environment variables)
+source config.env
+```
+
+**Then run LISA:**
 
 **Option 1: Remote API with Keyboard Input**
 ```bash
@@ -107,6 +131,11 @@ python scripts/lisa_local_kb.py
 **Option 3: Remote API with Clicker/Voice Input**
 ```bash
 python scripts/lisa_api_clicker.py
+```
+
+**One-liner (with config):**
+```bash
+source config.env && python scripts/lisa_api_kb.py
 ```
 
 ## Usage Examples
@@ -130,11 +159,14 @@ When LISA detects a worker without a hard hat:
 ## Project Structure
 
 ```
-LISA_v3_nav_clean/
+LISA-V2/
 ├── README.md                  # This file
 ├── SETUP.md                   # Detailed setup instructions
 ├── USAGE.md                   # Usage guide and examples
-├── requirements.txt           # Python dependencies
+├── CONFIG.md                  # Configuration guide (NEW)
+├── requirements.txt           # Python dependencies (pinned versions)
+├── config.env                 # Configuration template (NEW)
+├── .env                       # Local configuration (gitignored)
 ├── .gitignore                 # Git ignore patterns
 │
 ├── scripts/                   # Main executable scripts
@@ -143,6 +175,7 @@ LISA_v3_nav_clean/
 │   └── lisa_api_clicker.py    # Remote API + Clicker/ASR input
 │
 ├── src/                       # Core modules
+│   ├── config.py              # Configuration management (NEW)
 │   ├── robot_functions.py     # Robot control (SDK, TTS, camera)
 │   └── ros_functions.py       # ROS navigation and waypoints
 │
@@ -170,9 +203,9 @@ LISA_v3_nav_clean/
 
 ## Documentation
 
+- **[CONFIG.md](CONFIG.md)** - **⭐ Configuration guide** (environment variables, settings)
 - **[SETUP.md](SETUP.md)** - Detailed installation and configuration
 - **[USAGE.md](USAGE.md)** - Complete usage guide with examples
-- **[experimentation.md](experimentation.md)** - Experiment scenarios
 
 ## Key Technologies
 
@@ -183,13 +216,37 @@ LISA_v3_nav_clean/
 - **Piper TTS**: Text-to-speech synthesis
 - **OpenCV / VideoClient**: Camera and image capture
 
-## Environment Variables
+## Configuration
+
+LISA uses a centralized configuration system for easy setup and deployment.
+
+### Quick Configuration
+
+```bash
+# 1. Edit the configuration file
+nano config.env
+
+# 2. Source it to set environment variables
+source config.env
+
+# 3. Run LISA
+python scripts/lisa_api_kb.py
+```
+
+### Key Configuration Options
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `UNITREE_SDK_PATH` | Path to Unitree SDK | `/home/unitree/unitree_sdk2_python` |
+| `CYCLONEDDS_HOME` | Path to CycloneDDS | `/home/unitree/cyclonedds/install` |
+| `OLLAMA_API_BASE` | Ollama API endpoint | `http://192.168.50.103:11434` |
 | `LISA_CHAT_MODEL` | Chat model name | `gemma3:27b` (API) / `gemma3:4b` (Local) |
 | `LISA_VISION_MODEL` | Vision model name | `gemma3:27b` (API) / `gemma3:4b` (Local) |
+| `TTS_MODEL_NAME` | TTS model file | `en_US-amy-medium.onnx` |
+| `ASR_MODEL` | Whisper ASR model | `tiny.en` |
+| `ENABLE_SPEECH` | Enable speech output | `true` |
+
+**📖 See [CONFIG.md](CONFIG.md) for complete configuration documentation**
 
 ## Contributing
 

@@ -14,6 +14,9 @@ env/
 ENV/
 lisa_demo/
 
+# Environment configuration
+.env
+
 # Audio files (except cue sounds in audio/ directory)
 *.wav
 !audio/start_cue.wav

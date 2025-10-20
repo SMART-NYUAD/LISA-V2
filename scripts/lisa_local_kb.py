@@ -35,6 +35,7 @@ import base64
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
+from config import config
 from ollama import chat, ChatResponse
 from robot_functions import robot_take_pic, robot_speak, preload_tts_model
 from ros_functions import (
@@ -44,8 +45,8 @@ from ros_functions import (
 )
  
 
-# Enable speech
-ENABLE_SPEECH = True
+# Enable speech (from config)
+ENABLE_SPEECH = config.ENABLE_SPEECH
 
 def setup_terminal_log(log_dir: str) -> str:
     """Tee stdout/stderr to a timestamped log file in the given directory."""
@@ -72,9 +73,9 @@ def setup_terminal_log(log_dir: str) -> str:
     print(f"Logging terminal output to: {log_path}")
     return log_path
 
-# Models
-DEFAULT_CHAT_MODEL = os.environ.get("LISA_CHAT_MODEL", "gemma3:4b")
-DEFAULT_VISION_MODEL = os.environ.get("LISA_VISION_MODEL", "gemma3:4b")
+# Models (from config - use local models)
+DEFAULT_CHAT_MODEL = config.LOCAL_CHAT_MODEL
+DEFAULT_VISION_MODEL = config.LOCAL_VISION_MODEL
 
 # Path to last captured image (relative to script directory)
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
