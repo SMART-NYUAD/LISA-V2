@@ -69,9 +69,13 @@ class Config:
     ENABLE_SPEECH = os.getenv("ENABLE_SPEECH", "true").lower() == "true"
     
     # ============================================
-    # Logging Configuration
+    # File Paths
     # ============================================
     LOG_DIR = os.getenv("LOG_DIR", "logs")
+    
+    # Image and audio paths (absolute paths from project root)
+    TMP_DIR = PROJECT_ROOT / "tmp"
+    LAST_IMAGE_PATH = TMP_DIR / "frame.jpg"
     
     @classmethod
     def print_config(cls):

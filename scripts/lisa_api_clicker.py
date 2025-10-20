@@ -92,9 +92,8 @@ OLLAMA_CHAT_ENDPOINT = config.OLLAMA_CHAT_ENDPOINT
 DEFAULT_CHAT_MODEL = config.CHAT_MODEL
 DEFAULT_VISION_MODEL = config.VISION_MODEL
 
-# Path to last captured image (relative to script directory)
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-LAST_IMAGE_PATH = os.path.join(SCRIPT_DIR, "tmp", "frame.jpg")
+# Path to last captured image (from config - absolute path)
+LAST_IMAGE_PATH = str(config.LAST_IMAGE_PATH)
 
 def encode_image_to_base64(image_path):
     """Read image from disk and return base64-encoded string."""

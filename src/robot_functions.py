@@ -137,24 +137,32 @@ def robot_hello():
         print(f"Error: {e}")
         return False
 
-def robot_take_pic(use_flash=True, flash_brightness=5, output_file="tmp/frame.jpg"):
+def robot_take_pic(use_flash=True, flash_brightness=5, output_file=None):
     """
     Makes the robot take a picture with the front camera using the SDK
     
     Args:
         use_flash (bool): Whether to use the searchlight
         flash_brightness (int): Brightness level (0-10)
-        output_file (str): Path to save the captured frame
+        output_file (str): Path to save the captured frame (default: PROJECT_ROOT/tmp/frame.jpg)
     
     Returns:
         bool: True if frame was captured successfully
     """
+    # Default output path - project root / tmp / frame.jpg
+    if output_file is None:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(script_dir)
+        output_file = os.path.join(project_root, "tmp", "frame.jpg")
+    
     _, vui_client, _ = initialize_sdk()
     # Get video client separately since it's not returned by initialize_sdk
     video_client = _video_client
     
     # Ensure output directory exists
-    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    output_dir = os.path.dirname(output_file)
+    if output_dir:  # Only create if there's a directory component
+        os.makedirs(output_dir, exist_ok=True)
     
     try:
         # Set flash if requested
