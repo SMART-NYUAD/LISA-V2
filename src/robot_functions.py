@@ -229,12 +229,14 @@ def generate_speech(text, model_name="en_US-amy-medium.onnx", output_dir="tmp"):
     """
     # Get script directory
     script_dir = os.path.dirname(os.path.abspath(__file__))
+    # Get project root (parent of src directory)
+    project_root = os.path.dirname(script_dir)
     
     # Full path to model file - check if model_name is already an absolute path
     if os.path.isabs(model_name):
         model_path = model_name
     else:
-        model_path = os.path.join(script_dir, "TTS_models", model_name)
+        model_path = os.path.join(project_root, "TTS_models", model_name)
     
     # Ensure output directory exists
     output_path = os.path.join(script_dir, output_dir)
