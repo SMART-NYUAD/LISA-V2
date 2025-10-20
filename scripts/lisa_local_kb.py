@@ -36,7 +36,7 @@ import base64
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from ollama import chat, ChatResponse
-from robot_functions import robot_take_pic, robot_speak
+from robot_functions import robot_take_pic, robot_speak, preload_tts_model
 from ros_functions import (
     navigate_to, 
     start_status_listener, 
@@ -309,6 +309,9 @@ def main():
     print("Type 'quit' or 'exit' to end the session")
     print("Type 'clear' to clear chat history")
     print("==========================================\n")
+    
+    # Preload TTS model to eliminate first-call latency
+    preload_tts_model()
     
     welcome_message = "Hello! I'm LISA, your navigation and camera assistant. I can go to different locations, take pictures, and analyze what I see. What would you like me to do?"
     print(f"LISA: {welcome_message}")

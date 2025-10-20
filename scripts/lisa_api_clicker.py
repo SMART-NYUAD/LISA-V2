@@ -47,7 +47,7 @@ import base64
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from robot_functions import robot_take_pic, robot_speak, robot_listen
+from robot_functions import robot_take_pic, robot_speak, robot_listen, preload_tts_model
 from ros_functions import (
     navigate_to, 
     start_status_listener, 
@@ -328,6 +328,9 @@ def main():
     print(f"API endpoint: {OLLAMA_API_BASE}")
     print("Uses clicker for input and ASR for speech recognition")
     print("==========================================\n")
+    
+    # Preload TTS model to eliminate first-call latency
+    preload_tts_model()
     
     welcome_message = "Hello! I'm LISA, your navigation and camera assistant. I can go to different locations, take pictures, and analyze what I see. How can I help you today?"
     print(f"LISA: {welcome_message}")

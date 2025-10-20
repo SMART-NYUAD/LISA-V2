@@ -65,6 +65,9 @@ _vui_client = None
 _audio_client = None
 _video_client = None
 
+# Global cache for Piper TTS voice model
+_piper_voice_cache = {}
+
 # Configuration
 ASR_MODEL = "tiny.en"  # Whisper ASR model to use: tiny.en, base.en, small.en, medium.en, large
 
@@ -215,6 +218,36 @@ def set_volume(volume_level=6):
         print(f"Error setting volume: {e}")
         return -1
 
+def preload_tts_model(model_name="en_US-amy-medium.onnx"):
+    """
+    Preload the TTS model into cache to avoid latency on first speech generation.
+    
+    Args:
+        model_name (str): Name of the model file in TTS_models directory
+    """
+    global _piper_voice_cache
+    
+    # Get script directory
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    # Get project root (parent of src directory)
+    project_root = os.path.dirname(script_dir)
+    
+    # Full path to model file - check if model_name is already an absolute path
+    if os.path.isabs(model_name):
+        model_path = model_name
+    else:
+        model_path = os.path.join(project_root, "TTS_models", model_name)
+    
+    # Only load if not already cached
+    if model_path not in _piper_voice_cache:
+        print(f"[TTS] Preloading model: {model_name}...", end=" ", flush=True)
+        load_start = time.time()
+        voice = PiperVoice.load(model_path)
+        _piper_voice_cache[model_path] = voice
+        print(f"done ({time.time() - load_start:.2f}s)")
+    else:
+        print(f"[TTS] Model already cached: {model_name}")
+
 def generate_speech(text, model_name="en_US-amy-medium.onnx", output_dir="tmp"):
     """
     Generate speech from text and save it as a WAV file.
@@ -227,6 +260,9 @@ def generate_speech(text, model_name="en_US-amy-medium.onnx", output_dir="tmp"):
     Returns:
         str: Path to the generated audio file
     """
+    global _piper_voice_cache
+    start_time = time.time()
+    
     # Get script directory
     script_dir = os.path.dirname(os.path.abspath(__file__))
     # Get project root (parent of src directory)
@@ -245,15 +281,30 @@ def generate_speech(text, model_name="en_US-amy-medium.onnx", output_dir="tmp"):
     # Output file path
     output_file = os.path.join(output_path, "output.wav")
     
-    # Initialize the Piper voice
-    voice = PiperVoice.load(model_path)
+    # Load or retrieve cached Piper voice
+    if model_path in _piper_voice_cache:
+        voice = _piper_voice_cache[model_path]
+        print(f"[TTS] Using cached model")
+    else:
+        load_start = time.time()
+        voice = PiperVoice.load(model_path)
+        _piper_voice_cache[model_path] = voice
+        print(f"[TTS] Model loaded in {time.time() - load_start:.2f}s")
     
-    # Open a WAV file for writing
+    # Write to WAV file progressively as chunks arrive
+    synth_start = time.time()
     with wave.open(output_file, 'wb') as wav_file:
-        # Synthesize text to speech and write to the open WAV file
-        voice.synthesize(text, wav_file)
+        # Configure WAV file parameters based on the voice
+        wav_file.setnchannels(1)  # Mono audio
+        wav_file.setsampwidth(2)  # 16-bit audio (2 bytes)
+        wav_file.setframerate(voice.config.sample_rate)  # Use voice's sample rate
+        
+        # Synthesize and write chunks as they arrive (streaming approach)
+        for chunk in voice.synthesize(text):
+            wav_file.writeframes(chunk.audio_int16_bytes)
     
-    #print(f"Text successfully synthesized and saved to {output_file}")
+    print(f"[TTS] Synthesis completed in {time.time() - synth_start:.2f}s")
+    print(f"[TTS] Total generation time: {time.time() - start_time:.2f}s")
     return output_file
 
 def play_audio(audio_file, audio_client=None):
@@ -278,11 +329,15 @@ def play_audio(audio_file, audio_client=None):
         duration_ms = 5000  # fallback to 5 seconds
 
     # Enable Megaphone
+    megaphone_start = time.time()
     audio_client.MegaphoneEnter()
+    print(f"[Playback] Megaphone enabled in {time.time() - megaphone_start:.2f}s")
 
     # Upload audio file
-    print("Uploading and playing audio...")
+    upload_start = time.time()
+    print("Uploading audio to robot...")
     audio_client.MegaphoneUpload(audio_file)
+    print(f"[Playback] Upload completed in {time.time() - upload_start:.2f}s")
     
     # Wait for playback without verbose progress; just print a single status line
     try:
