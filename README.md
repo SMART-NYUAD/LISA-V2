@@ -1,12 +1,12 @@
-# LISA - AI-Powered Robot Navigation & Safety Assistant
+# LISA - Local Intelligent Safety Assistant
 
-LISA (Local Intelligent Safety Assistant) is an AI-powered assistant that runs on quadruped robots (Unitree Go2W) to provide autonomous navigation, visual inspection, and safety monitoring capabilities for construction sites and industrial environments.
+LISA (Local Intelligent Safety Assistant) is an LLM-powered assistant that runs on quadruped robots (Unitree Go2W) to provide autonomous navigation, visual inspection, and safety monitoring capabilities for construction sites and industrial environments.
 
 ## Features
 
-- 🤖 **Autonomous Navigation**: Navigate to predefined waypoints using ROS 2
+- 🤖 **Autonomous Navigation**: Navigate to predefined waypoints using ROS2
 - 📸 **Camera Control**: Take pictures and analyze visual data
-- 🔍 **AI Vision Analysis**: Use vision models to understand and describe scenes
+- 🔍 **Vision Analysis**: Use vision models to understand and describe scenes
 - 🦺 **Safety Monitoring**: Detect PPE violations (hard hat detection) and execute safety protocols
 - 🎤 **Voice Interaction**: Support for both keyboard and clicker-based voice input
 - 🔊 **Text-to-Speech**: Natural voice responses using Piper TTS
@@ -16,30 +16,29 @@ LISA (Local Intelligent Safety Assistant) is an AI-powered assistant that runs o
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      User Interface Layer                     │
-│  (Keyboard Input / Clicker + Whisper ASR)                    │
+│                      User Interface Layer                   │
+│           (Keyboard Input / Clicker + Microphone/Speaker)   │
 └────────────────┬────────────────────────────────────────────┘
                  │
 ┌────────────────▼────────────────────────────────────────────┐
-│                    LISA Main Scripts                         │
+│                    LISA Main Scripts                        │
 │  • lisa_api_kb.py (Remote API + Keyboard)                   │
 │  • lisa_local_kb.py (Local Ollama + Keyboard)               │
 │  • lisa_api_clicker.py (Remote API + Clicker/ASR)           │
-└────────┬───────────────────────────────┬────────────────────┘
-         │                               │
+└────────┬──────────────────────────────┬─────────────────────┘
+         │                              │
 ┌────────▼──────────┐         ┌─────────▼──────────┐
-│  Robot Functions  │         │   ROS Functions    │
+│  Unitree SDK      │         │   ROS Functions    │
 │  • Camera         │         │   • Navigation     │
-│  • TTS/ASR        │         │   • UDP Bridge     │
-│  • Unitree SDK    │         │   • Goal Tracking  │
+│  • Speaker        │         │                    │
 └───────────────────┘         └────────────────────┘
          │                               │
 ┌────────▼───────────────────────────────▼────────────────────┐
-│              Hardware / External Services                    │
-│  • Unitree Go2 Robot                                         │
-│  • ROS 2 Navigation Stack                                    │
-│  • Ollama LLM (Local or Remote)                              │
-└──────────────────────────────────────────────────────────────┘
+│              Hardware / External Services                   │
+│  • Unitree Go2 Robot                                        │
+│  • ROS 2 Navigation Stack                                   │
+│  • Ollama LLM (Local or Remote)                             │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ## Quick Start
@@ -163,10 +162,10 @@ LISA-V2/
 ├── README.md                  # This file
 ├── SETUP.md                   # Detailed setup instructions
 ├── USAGE.md                   # Usage guide and examples
-├── CONFIG.md                  # Configuration guide (NEW)
-├── requirements.txt           # Python dependencies (pinned versions)
-├── config.env                 # Configuration template (NEW)
-├── .env                       # Local configuration (gitignored)
+├── CONFIG.md                  # Configuration guide 
+├── requirements.txt           # Python dependencies 
+├── config.env                 # Configuration template 
+├── .env                       # Local configuration 
 ├── .gitignore                 # Git ignore patterns
 │
 ├── scripts/                   # Main executable scripts
@@ -175,7 +174,7 @@ LISA-V2/
 │   └── lisa_api_clicker.py    # Remote API + Clicker/ASR input
 │
 ├── src/                       # Core modules
-│   ├── config.py              # Configuration management (NEW)
+│   ├── config.py              # Configuration management 
 │   ├── robot_functions.py     # Robot control (SDK, TTS, camera)
 │   └── ros_functions.py       # ROS navigation and waypoints
 │
@@ -264,15 +263,8 @@ Contributions are welcome! Please ensure:
 - The robot does not physically manipulate objects (safety equipment delivery is simulated)
 - Vision-based safety detection should be used as a supplement to, not replacement for, human oversight
 
-## License
-
-[Add your license information here]
-
 ## Contact
 
-[Add contact information or project maintainer details]
+nas@nyu.edu
 
-## Acknowledgments
-
-Built for construction site safety and worker assistance applications using Unitree Go2 quadruped robot platform.
 
