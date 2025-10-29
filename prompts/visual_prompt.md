@@ -1,1 +1,1 @@
-Describe this image. Include what you see in the scene, any people and what they're wearing, equipment present, and note any potential safety concerns or hazards you observe. Keep it short.
+CRITICAL: Respond with MAXIMUM 40 words total. Describe in 2-3 short sentences: people present, PPE worn, visible hazards, overall safety status. NO numbered lists. NO bullet points. Use simple prose only. Example: "One worker visible wearing hard hat and vest. Unsecured ladder near edge presents fall risk. Conditions are unsafe."

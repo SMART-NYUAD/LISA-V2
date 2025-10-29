@@ -47,7 +47,7 @@ import base64
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from config import config
-from robot_functions import robot_take_pic, robot_speak, robot_listen, preload_tts_model
+from robot_functions import robot_take_pic, robot_speak, robot_listen, preload_tts_model, preload_asr_model
 from ros_functions import (
     navigate_to, 
     start_status_listener, 
@@ -169,7 +169,12 @@ def execute_function(function_call, chat_model, vision_model, messages, logger):
     if speak_message and function_name != "speak":
         print(f"LISA: {speak_message}")
         if ENABLE_SPEECH:
-            robot_speak(speak_message)
+            try:
+                robot_speak(speak_message)
+            except KeyboardInterrupt:
+                raise  # Re-raise to allow outer handlers to catch it
+            except Exception as e:
+                print(f"Speech error: {e}")
     
     start_time = time.time()
     
@@ -225,7 +230,12 @@ def execute_function(function_call, chat_model, vision_model, messages, logger):
             analysis_result = response['message']['content'].strip()
             print(f"Analysis result: {analysis_result}")
             if ENABLE_SPEECH:
-                robot_speak(analysis_result)
+                try:
+                    robot_speak(analysis_result)
+                except KeyboardInterrupt:
+                    raise
+                except Exception as e:
+                    print(f"Speech error during analysis: {e}")
             
             return f"Image analysis: {analysis_result}"
             
@@ -236,7 +246,12 @@ def execute_function(function_call, chat_model, vision_model, messages, logger):
             
             print(f"LISA: {message}")
             if ENABLE_SPEECH:
-                robot_speak(message)
+                try:
+                    robot_speak(message)
+                except KeyboardInterrupt:
+                    raise
+                except Exception as e:
+                    print(f"Speech error: {e}")
             
             return f"Spoke: {message}"
             
@@ -258,11 +273,16 @@ def _handle_sigint(signum, frame):
 
 def main():
     """Main function to run the navigation and camera assistant with ASR/clicker input."""
+    global _shutdown_requested
+    
     chat_model = DEFAULT_CHAT_MODEL
     vision_model = DEFAULT_VISION_MODEL
     
     # Tee terminal output to file
     setup_terminal_log("../logs/api")
+    
+    # Setup audio system (default source and mic gain)
+    config.setup_audio()
     
     # Initialize status listener
     start_status_listener()
@@ -275,16 +295,25 @@ def main():
     print(f"Using Ollama chat model: {chat_model}")
     print(f"Using Ollama vision model: {vision_model}")
     print(f"API endpoint: {OLLAMA_API_BASE}")
+    print(f"ASR model: {config.ASR_MODEL}")
     print("Uses clicker for input and ASR for speech recognition")
     print("==========================================\n")
     
     # Preload TTS model to eliminate first-call latency
     preload_tts_model()
     
-    welcome_message = "Hello! I'm LISA, your safety analysis assistant. I can take pictures and analyze them to provide safety insights. How can I help you today?"
+    # Preload ASR model to eliminate first-transcription latency
+    preload_asr_model()
+    
+    welcome_message = "Hello! I'm LISA"
     print(f"LISA: {welcome_message}")
     if ENABLE_SPEECH:
-        robot_speak(welcome_message)
+        try:
+            robot_speak(welcome_message)
+        except KeyboardInterrupt:
+            print("\nInterrupted during welcome message")
+            _shutdown_requested = True
+            return
     
     # Install graceful Ctrl+C handler
     signal.signal(signal.SIGINT, _handle_sigint)
@@ -292,11 +321,17 @@ def main():
     # Main conversation loop via ASR/clicker
     while not _shutdown_requested:
         try:
-            user_input = robot_listen()
+            user_input = robot_listen(shutdown_flag_getter=lambda: _shutdown_requested)
+            
+            # Check shutdown after listening (in case Ctrl+C was pressed)
+            if _shutdown_requested:
+                break
             
             # Handle case where listening failed or was cancelled
             if user_input is None:
                 print("Listening cancelled or failed, waiting for next input.")
+                if _shutdown_requested:
+                    break
                 continue
             
             # Check for the clear chat signal
@@ -306,7 +341,17 @@ def main():
                 continue
             
         except (EOFError, KeyboardInterrupt):
-            print("\n\nSession ended.")
+            print("\n\nShutting down gracefully...")
+            _shutdown_requested = True
+            break
+        except Exception as e:
+            print(f"Error in main loop: {e}")
+            if _shutdown_requested:
+                break
+            continue
+        
+        # Check shutdown before processing
+        if _shutdown_requested:
             break
         
         # Handle empty input
@@ -334,6 +379,10 @@ def main():
         messages.append({"role": "user", "content": user_input})
         
         try:
+            # Check shutdown before expensive operations
+            if _shutdown_requested:
+                break
+            
             print("LISA is thinking...")
             start_time = time.time()
             
@@ -343,6 +392,10 @@ def main():
                 messages=messages,
                 options={'temperature': 0.3}
             )
+            
+            # Check shutdown after LLM call
+            if _shutdown_requested:
+                break
             
             duration = time.time() - start_time
             print(f"LISA thought for {duration:.2f} seconds.")
@@ -363,12 +416,23 @@ def main():
                 
                 # Special case: if take_picture succeeded, automatically analyze the image
                 if function_call.get("function") == "take_picture" and "successfully" in result.lower():
+                    if _shutdown_requested:
+                        break
+                    
                     print("Automatically analyzing the captured image...")
                     # Announce that we're analyzing
                     analysis_announcement = "Analyzing the image"
                     print(f"LISA: {analysis_announcement}")
                     if ENABLE_SPEECH:
-                        robot_speak(analysis_announcement)
+                        try:
+                            robot_speak(analysis_announcement)
+                        except KeyboardInterrupt:
+                            print("\nInterrupted during analysis announcement")
+                            _shutdown_requested = True
+                            break
+                    
+                    if _shutdown_requested:
+                        break
                     
                     analyze_call = {
                         "function": "analyze_image",
@@ -382,22 +446,44 @@ def main():
                 # Regular conversational response
                 print(f"LISA: {assistant_response}")
                 if ENABLE_SPEECH:
-                    robot_speak(assistant_response)
+                    try:
+                        robot_speak(assistant_response)
+                    except KeyboardInterrupt:
+                        print("\nInterrupted during speech")
+                        _shutdown_requested = True
+                        break
                 messages.append({"role": "assistant", "content": assistant_response})
         
+        except KeyboardInterrupt:
+            print("\n\nShutting down gracefully...")
+            _shutdown_requested = True
+            break
         except Exception as e:
             error_message = f"Error: {str(e)}"
             print(error_message)
-            print("LISA: I encountered an error. Please try again.")
-            if ENABLE_SPEECH:
-                robot_speak("I encountered an error. Please try again.")
-            # Error already printed; nothing else to do
+            if not _shutdown_requested:
+                print("LISA: I encountered an error. Please try again.")
+                if ENABLE_SPEECH:
+                    try:
+                        robot_speak("I encountered an error. Please try again.")
+                    except:
+                        pass
         
         # Turn end is implicitly logged by terminal tee
     
-    print("Session ended.")
+    print("\n=== Session ended ===")
+    print("Cleaning up and exiting...")
+    sys.exit(0)
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n\n=== Interrupted by user ===")
+        print("Exiting...")
+        sys.exit(0)
+    except Exception as e:
+        print(f"\n\nUnexpected error: {e}")
+        sys.exit(1)
 
 

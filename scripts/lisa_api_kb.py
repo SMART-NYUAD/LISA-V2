@@ -36,7 +36,7 @@ import base64
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from config import config
-from robot_functions import robot_take_pic, robot_speak, preload_tts_model
+from robot_functions import robot_take_pic, robot_speak, preload_tts_model, preload_asr_model
 from ros_functions import (
     navigate_to, 
     start_status_listener, 
@@ -246,6 +246,9 @@ def main():
     # Tee terminal output to file
     setup_terminal_log("../logs/api")
     
+    # Setup audio system (default source and mic gain)
+    config.setup_audio()
+    
     # Initialize status listener
     start_status_listener()
     
@@ -257,12 +260,16 @@ def main():
     print(f"Using Ollama chat model: {chat_model}")
     print(f"Using Ollama vision model: {vision_model}")
     print(f"API endpoint: {OLLAMA_API_BASE}")
+    print(f"ASR model: {config.ASR_MODEL}")
     print("Type 'quit' or 'exit' to end the session")
     print("Type 'clear' to clear chat history")
     print("==========================================\n")
     
     # Preload TTS model to eliminate first-call latency
     preload_tts_model()
+    
+    # Preload ASR model to eliminate first-transcription latency
+    preload_asr_model()
     
     welcome_message = "Hello! I'm LISA, your safety analysis assistant. I can take pictures and analyze them to provide safety insights. How can I help you today?"
     print(f"LISA: {welcome_message}")

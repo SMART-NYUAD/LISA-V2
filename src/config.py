@@ -63,6 +63,12 @@ class Config:
     ASR_MODEL = os.getenv("ASR_MODEL", "tiny.en")
     
     # ============================================
+    # Audio Configuration
+    # ============================================
+    DEFAULT_AUDIO_SOURCE = os.getenv("DEFAULT_AUDIO_SOURCE", None)
+    USB_MIC_GAIN = os.getenv("USB_MIC_GAIN", "35")
+    
+    # ============================================
     # Robot Configuration
     # ============================================
     ROBOT_INTERFACE = os.getenv("ROBOT_INTERFACE", "eth0")
@@ -78,6 +84,41 @@ class Config:
     LAST_IMAGE_PATH = TMP_DIR / "frame.jpg"
     
     @classmethod
+    def setup_audio(cls):
+        """Configure audio system with default source and microphone gain"""
+        import subprocess
+        
+        # Set default audio source if specified
+        if cls.DEFAULT_AUDIO_SOURCE:
+            try:
+                subprocess.run(
+                    ["pactl", "set-default-source", cls.DEFAULT_AUDIO_SOURCE],
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+                print(f"[Audio] Set default source: {cls.DEFAULT_AUDIO_SOURCE}")
+            except subprocess.CalledProcessError as e:
+                print(f"[Audio] Warning: Could not set default source: {e.stderr.strip()}")
+            except FileNotFoundError:
+                print("[Audio] Warning: pactl not found, skipping default source setup")
+        
+        # Set USB microphone gain if specified
+        if cls.USB_MIC_GAIN:
+            try:
+                subprocess.run(
+                    ["amixer", "-c", "0", "cset", "numid=8", cls.USB_MIC_GAIN],
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+                print(f"[Audio] Set USB mic gain: {cls.USB_MIC_GAIN}")
+            except subprocess.CalledProcessError as e:
+                print(f"[Audio] Warning: Could not set mic gain: {e.stderr.strip()}")
+            except FileNotFoundError:
+                print("[Audio] Warning: amixer not found, skipping mic gain setup")
+    
+    @classmethod
     def print_config(cls):
         """Print current configuration (for debugging)"""
         print("\n=== LISA Configuration ===")
@@ -88,6 +129,8 @@ class Config:
         print(f"Vision Model: {cls.VISION_MODEL}")
         print(f"TTS Model: {cls.TTS_MODEL_NAME}")
         print(f"ASR Model: {cls.ASR_MODEL}")
+        print(f"Default Audio Source: {cls.DEFAULT_AUDIO_SOURCE}")
+        print(f"USB Mic Gain: {cls.USB_MIC_GAIN}")
         print(f"Robot Interface: {cls.ROBOT_INTERFACE}")
         print(f"Speech Enabled: {cls.ENABLE_SPEECH}")
         print(f"Log Directory: {cls.LOG_DIR}")

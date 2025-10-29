@@ -68,8 +68,12 @@ _video_client = None
 # Global cache for Piper TTS voice model
 _piper_voice_cache = {}
 
-# Configuration
-ASR_MODEL = "tiny.en"  # Whisper ASR model to use: tiny.en, base.en, small.en, medium.en, large
+# Global cache for Whisper ASR model
+_whisper_model_cache = {}
+
+# Import config for ASR model
+from config import config
+ASR_MODEL = config.ASR_MODEL  # Whisper ASR model from config
 
 def initialize_sdk(interface="eth0"):
     """Initialize the Unitree SDK and clients"""
@@ -256,6 +260,28 @@ def preload_tts_model(model_name="en_US-amy-medium.onnx"):
     else:
         print(f"[TTS] Model already cached: {model_name}")
 
+def preload_asr_model(model_name=None):
+    """
+    Preload the Whisper ASR model into cache to avoid latency on first transcription.
+    
+    Args:
+        model_name (str): Whisper model name (e.g., 'tiny.en', 'base.en'). Defaults to ASR_MODEL.
+    """
+    global _whisper_model_cache
+    
+    if model_name is None:
+        model_name = ASR_MODEL
+    
+    # Only load if not already cached
+    if model_name not in _whisper_model_cache:
+        print(f"[ASR] Preloading Whisper model: {model_name}...", end=" ", flush=True)
+        load_start = time.time()
+        model = whisper.load_model(model_name)
+        _whisper_model_cache[model_name] = model
+        print(f"done ({time.time() - load_start:.2f}s)")
+    else:
+        print(f"[ASR] Model already cached: {model_name}")
+
 def generate_speech(text, model_name="en_US-amy-medium.onnx", output_dir="tmp"):
     """
     Generate speech from text and save it as a WAV file.
@@ -436,7 +462,7 @@ def detect_clickers():
         return []
 # --------------------------------------------------------------------
 
-def record_audio(devices, output_path="tmp/recorded_audio.wav", sample_rate=44100, trigger_key="KEY_TAB", clear_key="KEY_PAGEDOWN"):
+def record_audio(devices, output_path="tmp/recorded_audio.wav", sample_rate=44100, trigger_key="KEY_TAB", clear_key="KEY_PAGEDOWN", shutdown_flag_getter=None):
     """
     Records audio when a specific key is pressed on given devices, stops on second press.
     Also listens for a clear key to signal chat clearing.
@@ -447,6 +473,7 @@ def record_audio(devices, output_path="tmp/recorded_audio.wav", sample_rate=4410
         sample_rate (int): Sample rate for the recording.
         trigger_key (str): The keycode string (e.g., 'KEY_TAB') to trigger recording.
         clear_key (str): The keycode string (e.g., 'KEY_PAGEDOWN') to signal chat clear.
+        shutdown_flag_getter (callable): Optional function that returns True if shutdown is requested.
 
     Returns:
         str: Path to the recorded audio file, "CLEAR_CHAT" if clear key was pressed,
@@ -464,6 +491,14 @@ def record_audio(devices, output_path="tmp/recorded_audio.wav", sample_rate=4410
 
     try:
         while True:
+            # Check if shutdown was requested
+            if shutdown_flag_getter and shutdown_flag_getter():
+                print("Shutdown requested, stopping recording...")
+                if stream and recording:
+                    stream.stop()
+                    stream.close()
+                raise KeyboardInterrupt()
+            
             r, _, _ = select(devices, [], [], 0.1) # Timeout avoids busy-waiting
             for device in r:
                 try:
@@ -538,7 +573,7 @@ def record_audio(devices, output_path="tmp/recorded_audio.wav", sample_rate=4410
         if stream and recording:
             stream.stop()
             stream.close()
-        return None # Indicate interruption
+        raise  # Re-raise to allow proper shutdown
     finally:
         # Ensure stream is closed if loop exits unexpectedly
         if stream and not stream.closed:
@@ -557,11 +592,23 @@ def transcribe_audio(audio_path, model_name=ASR_MODEL):
     Returns:
         str: Transcribed text
     """
-    model = whisper.load_model(model_name)
+    global _whisper_model_cache
+    
+    # Load or retrieve cached Whisper model
+    if model_name in _whisper_model_cache:
+        model = _whisper_model_cache[model_name]
+        print(f"[ASR] Using cached Whisper model: {model_name}")
+    else:
+        print(f"[ASR] Loading Whisper model: {model_name}...", end=" ", flush=True)
+        load_start = time.time()
+        model = whisper.load_model(model_name)
+        _whisper_model_cache[model_name] = model
+        print(f"done ({time.time() - load_start:.2f}s)")
+    
     result = model.transcribe(audio_path, fp16=False)
     return result["text"]
 
-def robot_listen(output_path="tmp/recorded_audio.wav", sample_rate=44100, model_name=ASR_MODEL, trigger_key="KEY_TAB", clear_key="KEY_PAGEDOWN"):
+def robot_listen(output_path="tmp/recorded_audio.wav", sample_rate=44100, model_name=ASR_MODEL, trigger_key="KEY_TAB", clear_key="KEY_PAGEDOWN", shutdown_flag_getter=None):
     """
     Detects clicker, records audio when the trigger key is pressed, stops recording
     on second press, transcribes the audio, OR detects the clear key press.
@@ -572,6 +619,7 @@ def robot_listen(output_path="tmp/recorded_audio.wav", sample_rate=44100, model_
         model_name (str): Whisper model to use.
         trigger_key (str): The keycode string to trigger recording (e.g., 'KEY_TAB').
         clear_key (str): The keycode string to trigger chat clear (e.g., 'KEY_PAGEDOWN').
+        shutdown_flag_getter (callable): Optional function that returns True if shutdown is requested.
 
     Returns:
         str: Transcribed text from the recorded audio, "CLEAR_CHAT" if clear key was pressed,
@@ -596,7 +644,7 @@ def robot_listen(output_path="tmp/recorded_audio.wav", sample_rate=44100, model_
             # Decide if we should continue without grab or fail? Let's try continuing.
 
     try:
-        record_result = record_audio(clicker_devices, output_path, sample_rate, trigger_key, clear_key)
+        record_result = record_audio(clicker_devices, output_path, sample_rate, trigger_key, clear_key, shutdown_flag_getter)
 
         if record_result == "CLEAR_CHAT":
             return "CLEAR_CHAT" # Pass the signal up
@@ -608,6 +656,10 @@ def robot_listen(output_path="tmp/recorded_audio.wav", sample_rate=44100, model_
         else:
             print("Recording was cancelled or failed.")
             return None
+    
+    except KeyboardInterrupt:
+        print("Listening interrupted, cleaning up devices...")
+        raise  # Re-raise after cleanup in finally block
             
     finally:
         # Release and close the devices to avoid noisy __del__ errors on Ctrl+C
