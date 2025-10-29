@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 """
-LISA - AI-Powered Robot Navigation & Safety Assistant (API + Clicker/ASR Mode)
+LISA - AI-Powered Safety Analysis Assistant (API + Clicker/ASR Mode)
 
 This script runs LISA with a remote Ollama API backend and hands-free voice input
-via wireless presenter clicker and Whisper ASR. Designed for production deployment.
+via wireless presenter clicker and Whisper ASR. Simplified for conference demos.
 
 Key Features:
 - Remote Ollama API for LLM inference
 - Clicker-triggered voice input (hands-free)
 - Automatic speech recognition (Whisper)
-- Robot navigation via ROS 2
 - Camera control and vision analysis
-- Safety monitoring with PPE detection
+- Safety-focused image analysis
 - Text-to-speech announcements with audio cues
 
 Usage:
@@ -32,7 +31,7 @@ Supported Clicker Devices:
     - KNORVAY Knorvay Wireless Presenter Keyboard
 
 Author: [Your team/organization]
-Version: 2.0
+Version: 3.0 - Conference Demo Edition
 """
 import sys
 import time
@@ -166,8 +165,8 @@ def execute_function(function_call, chat_model, vision_model, messages, logger):
     params = function_call.get("params", {})
     speak_message = function_call.get("speak")
     
-    # Announce what we're doing if specified
-    if speak_message:
+    # Announce what we're doing if specified (but not for 'speak' function to avoid duplication)
+    if speak_message and function_name != "speak":
         print(f"LISA: {speak_message}")
         if ENABLE_SPEECH:
             robot_speak(speak_message)
@@ -175,25 +174,7 @@ def execute_function(function_call, chat_model, vision_model, messages, logger):
     start_time = time.time()
     
     try:
-        if function_name == "navigate_to":
-            location = params.get("location")
-            if not location:
-                return "Error: No location specified for navigation"
-            
-            print(f"Navigating to {location}...")
-            goal_id = navigate_to(location)
-            result = wait_for_goal_completion(goal_id, timeout=120.0)
-            
-            if result == "SUCCEEDED":
-                success_msg = f"Successfully reached {location}"
-                print(success_msg)
-                return success_msg
-            else:
-                error_msg = f"Navigation to {location} failed: {result}"
-                print(error_msg)
-                return error_msg
-                
-        elif function_name == "take_picture":
+        if function_name == "take_picture":
             print("Taking a picture...")
             success = robot_take_pic()
             
@@ -215,12 +196,13 @@ def execute_function(function_call, chat_model, vision_model, messages, logger):
             image_data = encode_image_to_base64(LAST_IMAGE_PATH)
             analysis_prompt = params.get("prompt", "Describe what you see in this image")
             
-            # Load visual prompt template from file and inject analysis prompt
+            # Load visual prompt template from file
             try:
                 script_dir = os.path.dirname(os.path.abspath(__file__))
                 visual_prompt_path = os.path.join(script_dir, "..", "prompts", "visual_prompt.md")
                 visual_prompt_template = load_prompt(visual_prompt_path)
-                full_prompt = visual_prompt_template.replace("{{ANALYSIS_PROMPT}}", analysis_prompt)
+                # Use the visual prompt directly
+                full_prompt = visual_prompt_template
             except Exception as e:
                 return f"Error loading visual prompt: {e}"
             
@@ -242,12 +224,13 @@ def execute_function(function_call, chat_model, vision_model, messages, logger):
             
             analysis_result = response['message']['content'].strip()
             print(f"Analysis result: {analysis_result}")
-            
+            if ENABLE_SPEECH:
+                robot_speak(analysis_result)
             
             return f"Image analysis: {analysis_result}"
             
         elif function_name == "speak":
-            message = params.get("message")
+            message = speak_message if speak_message else params.get("message")
             if not message:
                 return "Error: No message specified for speak function"
             
@@ -255,16 +238,7 @@ def execute_function(function_call, chat_model, vision_model, messages, logger):
             if ENABLE_SPEECH:
                 robot_speak(message)
             
-            
-            return f"Announced: {message}"
-            
-        elif function_name == "activate_safety_protocol":
-            return load_safety_protocol(messages)
-            
-        elif function_name == "wait_for_response":
-            # Signal that we're waiting for human input - don't continue workflow
-            message = params.get("message", "Waiting for response...")
-            return "WAIT_FOR_USER_INPUT"  # Special signal to break the function loop
+            return f"Spoke: {message}"
             
         else:
             return f"Error: Unknown function '{function_name}'"
@@ -274,31 +248,6 @@ def execute_function(function_call, chat_model, vision_model, messages, logger):
         print(error_msg)
         return error_msg
 
-
-def load_safety_protocol(messages):
-    """Load the safety protocol into the conversation."""
-    print("🚨 Safety violation detected - loading safety compliance protocol")
-    
-    # Load safety prompt
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    safety_prompt_path = os.path.join(script_dir, "..", "prompts", "side_prompt.md")
-    
-    if os.path.exists(safety_prompt_path):
-        safety_prompt = load_prompt(safety_prompt_path)
-        # Add safety prompt as system message
-        messages.append({
-            "role": "system", 
-            "content": f"SAFETY PROTOCOL ACTIVATED:\n\n{safety_prompt}"
-        })
-        messages.append({
-            "role": "user",
-            "content": "Safety protocol has been loaded. You must now begin STEP 1 of the safety workflow: Confirm the safety violation with the worker, ask for their name and ask if they want you to fetch a hard hat."
-        })
-        print("🔒 Safety compliance protocol loaded")
-        return "Safety protocol loaded and activated - beginning safety workflow"
-    else:
-        print("⚠️ Safety prompt file not found")
-        return "Error: Safety prompt file not found"
 
 _shutdown_requested = False
 
@@ -322,7 +271,7 @@ def main():
     messages = []
     
     # Welcome message
-    print("\n=== LISA - Navigation & Camera Assistant (Demo V2, API) ===")
+    print("\n=== LISA - Safety Analysis Assistant (Conference Demo) ===")
     print(f"Using Ollama chat model: {chat_model}")
     print(f"Using Ollama vision model: {vision_model}")
     print(f"API endpoint: {OLLAMA_API_BASE}")
@@ -332,7 +281,7 @@ def main():
     # Preload TTS model to eliminate first-call latency
     preload_tts_model()
     
-    welcome_message = "Hello! I'm LISA, your navigation and camera assistant. I can go to different locations, take pictures, and analyze what I see. How can I help you today?"
+    welcome_message = "Hello! I'm LISA, your safety analysis assistant. I can take pictures and analyze them to provide safety insights. How can I help you today?"
     print(f"LISA: {welcome_message}")
     if ENABLE_SPEECH:
         robot_speak(welcome_message)
@@ -412,42 +361,22 @@ def main():
                 messages.append({"role": "assistant", "content": assistant_response})
                 messages.append({"role": "user", "content": f"Function result: {result}"})
                 
-                # Always ask the LLM what to do next after a function execution
-                # Trust the LLM to naturally conclude workflows
-                while True:
-                    print("LISA is deciding what to do next...")
-                    followup_start = time.time()
-                    next_response = chat_with_api(
-                        model=chat_model,
-                        messages=messages,
-                        options={'temperature': 0.3}
-                    )
+                # Special case: if take_picture succeeded, automatically analyze the image
+                if function_call.get("function") == "take_picture" and "successfully" in result.lower():
+                    print("Automatically analyzing the captured image...")
+                    # Announce that we're analyzing
+                    analysis_announcement = "Analyzing the image"
+                    print(f"LISA: {analysis_announcement}")
+                    if ENABLE_SPEECH:
+                        robot_speak(analysis_announcement)
                     
-                    followup_duration = time.time() - followup_start
-                    print(f"LISA decided next action in {followup_duration:.2f} seconds.")
-                    
-                    next_text = next_response['message']['content'].strip()
-                    
-                    # Check if the next response is another function call
-                    next_function = extract_function_call(next_text)
-                    
-                    if next_function:
-                        print(f"DEBUG: Continuing with next function: {next_function}")
-                        next_result = execute_function(next_function, chat_model, vision_model, messages, None)
-                        messages.append({"role": "assistant", "content": next_text})
-                        messages.append({"role": "user", "content": f"Function result: {next_result}"})
-                        
-                        # Check if we should wait for user input
-                        if next_result == "WAIT_FOR_USER_INPUT":
-                            print("LISA is waiting for your response...")
-                            break
-                    else:
-                        # Regular response - end the workflow
-                        print(f"LISA: {next_text}")
-                        if ENABLE_SPEECH:
-                            robot_speak(next_text)
-                        messages.append({"role": "assistant", "content": next_text})
-                        break
+                    analyze_call = {
+                        "function": "analyze_image",
+                        "params": {"prompt": "Describe what you see with attention to safety"}
+                    }
+                    analyze_result = execute_function(analyze_call, chat_model, vision_model, messages, None)
+                    messages.append({"role": "assistant", "content": "Analyzing image..."})
+                    messages.append({"role": "user", "content": f"Function result: {analyze_result}"})
                 
             else:
                 # Regular conversational response
