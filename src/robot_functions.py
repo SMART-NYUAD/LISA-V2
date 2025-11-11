@@ -220,10 +220,10 @@ def set_volume(volume_level=6):
     
     try:
         # Set volume
-        vui_client.SetVolume(volume_level)
+        _vui_client.SetVolume(volume_level)
         
         # Get and return current volume
-        code, current_volume = vui_client.GetVolume()
+        code, current_volume = _vui_client.GetVolume()
         print(f"Volume set to: {current_volume}")
         return current_volume
     except Exception as e:

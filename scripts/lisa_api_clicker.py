@@ -47,7 +47,7 @@ import base64
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from config import config
-from robot_functions import robot_take_pic, robot_speak, robot_listen, preload_tts_model, preload_asr_model
+from robot_functions import robot_take_pic, robot_speak, robot_listen, preload_tts_model, preload_asr_model, set_volume
 from ros_functions import (
     navigate_to, 
     start_status_listener, 
@@ -310,6 +310,7 @@ def main():
     if ENABLE_SPEECH:
         try:
             robot_speak(welcome_message)
+            set_volume(10)
         except KeyboardInterrupt:
             print("\nInterrupted during welcome message")
             _shutdown_requested = True
