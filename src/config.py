@@ -69,6 +69,12 @@ class Config:
     ENABLE_SPEECH = os.getenv("ENABLE_SPEECH", "true").lower() == "true"
     
     # ============================================
+    # Audio Configuration
+    # ============================================
+    AUDIO_OUTPUT_DEVICE = os.getenv("AUDIO_OUTPUT_DEVICE", "usb_headset")
+    AUDIO_INPUT_DEVICE = os.getenv("AUDIO_INPUT_DEVICE", "usb_headset")
+    
+    # ============================================
     # File Paths
     # ============================================
     LOG_DIR = os.getenv("LOG_DIR", "logs")
@@ -90,6 +96,8 @@ class Config:
         print(f"ASR Model: {cls.ASR_MODEL}")
         print(f"Robot Interface: {cls.ROBOT_INTERFACE}")
         print(f"Speech Enabled: {cls.ENABLE_SPEECH}")
+        print(f"Audio Output Device: {cls.AUDIO_OUTPUT_DEVICE}")
+        print(f"Audio Input Device: {cls.AUDIO_INPUT_DEVICE}")
         print(f"Log Directory: {cls.LOG_DIR}")
         print("==========================\n")
 

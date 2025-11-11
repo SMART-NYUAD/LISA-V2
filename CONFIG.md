@@ -87,6 +87,42 @@ export ROBOT_INTERFACE="eth0"
 export ENABLE_SPEECH="true"
 ```
 
+### Audio Configuration
+
+```bash
+# Audio output device
+# Options: usb_headset, robot_speaker
+export AUDIO_OUTPUT_DEVICE="usb_headset"
+
+# Audio input device
+# Options: usb_headset, default
+export AUDIO_INPUT_DEVICE="usb_headset"
+```
+
+**Audio Output Device Options:**
+- `usb_headset` - Use USB headset for TTS and audio cues (default)
+- `robot_speaker` - Use robot's built-in speaker via Unitree SDK
+
+**Audio Input Device Options:**
+- `usb_headset` - Use USB headset microphone for voice input (default)
+- `default` - Use system default audio input device
+
+**Supported USB Headsets:**
+- Logitech USB headsets (Vendor ID: 046d)
+- Automatically detected by device name or vendor ID
+
+**Voice Input Trigger:**
+- **Volume Up button** on USB headset starts/stops audio recording
+- PAGEDOWN key (if available) clears chat history
+
+**Testing Audio Setup:**
+```bash
+# Test USB headset detection and functionality
+python test_usb_audio.py
+```
+
+For detailed migration information, see [USB_HEADSET_MIGRATION.md](USB_HEADSET_MIGRATION.md).
+
 ### Logging Configuration
 
 ```bash

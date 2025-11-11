@@ -71,6 +71,59 @@ _piper_voice_cache = {}
 # Configuration
 ASR_MODEL = "tiny.en"  # Whisper ASR model to use: tiny.en, base.en, small.en, medium.en, large
 
+def detect_usb_headset():
+    """
+    Detect USB headset (Logitech) for audio I/O using sounddevice.
+    
+    Returns:
+        tuple: (input_device_index, output_device_index) or (None, None) if not found
+    """
+    try:
+        devices = sd.query_devices()
+        input_device = None
+        output_device = None
+        
+        for idx, device in enumerate(devices):
+            device_name = device['name'].lower()
+            # Look for Logitech devices or specific gaming headset models
+            # Patterns: logitech, 046d (vendor ID), g435, g733, gaming headset with USB audio
+            if any(pattern in device_name for pattern in ['logitech', '046d', 'g435', 'g733', 'gaming headset']):
+                # Check if device supports input (recording)
+                if device['max_input_channels'] > 0:
+                    input_device = idx
+                    print(f"[Audio] Found USB headset input: {device['name']} (device {idx})")
+                # Check if device supports output (playback)
+                if device['max_output_channels'] > 0:
+                    output_device = idx
+                    print(f"[Audio] Found USB headset output: {device['name']} (device {idx})")
+        
+        return input_device, output_device
+    except Exception as e:
+        print(f"Error detecting USB headset: {e}")
+        return None, None
+
+def detect_usb_headset_input():
+    """
+    Detect USB headset (Logitech) as an input device for button events using evdev.
+    
+    Returns:
+        list: List of evdev.InputDevice objects for the USB headset
+    """
+    try:
+        devices = [evdev.InputDevice(path) for path in evdev.list_devices()]
+        selected_devices = []
+        for device in devices:
+            device_name = device.name.lower()
+            # Look for Logitech devices
+            if 'logitech' in device_name or '046d' in device_name:
+                selected_devices.append(device)
+                print(f"[Input] Found USB headset input device: {device.name}")
+        return selected_devices
+    except Exception as e:
+        print(f"Error detecting USB headset input devices: {e}")
+        print("Please ensure you have necessary permissions (e.g., add user to 'input' group).")
+        return []
+
 def initialize_sdk(interface="eth0"):
     """Initialize the Unitree SDK and clients"""
     global _sdk_initialized, _sport_client, _vui_client, _audio_client, _video_client
@@ -256,14 +309,16 @@ def preload_tts_model(model_name="en_US-amy-medium.onnx"):
     else:
         print(f"[TTS] Model already cached: {model_name}")
 
-def generate_speech(text, model_name="en_US-amy-medium.onnx", output_dir="tmp"):
+def generate_speech(text, model_name="en_US-amy-medium.onnx", output_dir="tmp", target_sample_rate=48000):
     """
     Generate speech from text and save it as a WAV file.
+    Resamples to target_sample_rate if needed (for USB headset compatibility).
     
     Args:
         text (str): The text to convert to speech
         model_name (str): Name of the model file in TTS_models directory
         output_dir (str): Directory to save the output file (relative to LISA_v1)
+        target_sample_rate (int): Target sample rate for output (default 48000 for USB headsets)
         
     Returns:
         str: Path to the generated audio file
@@ -299,30 +354,88 @@ def generate_speech(text, model_name="en_US-amy-medium.onnx", output_dir="tmp"):
         _piper_voice_cache[model_path] = voice
         print(f"[TTS] Model loaded in {time.time() - load_start:.2f}s")
     
-    # Write to WAV file progressively as chunks arrive
+    # Synthesize audio (collect all chunks first)
     synth_start = time.time()
-    with wave.open(output_file, 'wb') as wav_file:
-        # Configure WAV file parameters based on the voice
-        wav_file.setnchannels(1)  # Mono audio
-        wav_file.setsampwidth(2)  # 16-bit audio (2 bytes)
-        wav_file.setframerate(voice.config.sample_rate)  # Use voice's sample rate
-        
-        # Synthesize and write chunks as they arrive (streaming approach)
-        for chunk in voice.synthesize(text):
-            wav_file.writeframes(chunk.audio_int16_bytes)
+    audio_chunks = []
+    for chunk in voice.synthesize(text):
+        audio_chunks.append(np.frombuffer(chunk.audio_int16_bytes, dtype=np.int16))
+    
+    # Concatenate all audio chunks
+    audio_data = np.concatenate(audio_chunks) if audio_chunks else np.array([], dtype=np.int16)
+    source_sample_rate = voice.config.sample_rate
+    
+    # Resample if needed (once during generation for best quality)
+    if source_sample_rate != target_sample_rate:
+        print(f"[TTS] Resampling {source_sample_rate}Hz -> {target_sample_rate}Hz")
+        from scipy.signal import resample_poly
+        from math import gcd
+        g = gcd(source_sample_rate, target_sample_rate)
+        up = target_sample_rate // g
+        down = source_sample_rate // g
+        audio_data = resample_poly(audio_data, up, down).astype(np.int16)
+        final_sample_rate = target_sample_rate
+    else:
+        final_sample_rate = source_sample_rate
+    
+    # Write to WAV file
+    write(output_file, final_sample_rate, audio_data)
     
     print(f"[TTS] Synthesis completed in {time.time() - synth_start:.2f}s")
     print(f"[TTS] Total generation time: {time.time() - start_time:.2f}s")
     return output_file
 
+def play_audio_usb(audio_file, output_device=None):
+    """
+    Play audio file on USB headset using sounddevice.
+    Audio should already be at the correct sample rate (48kHz for most USB headsets).
+    
+    Args:
+        audio_file (str): Path to the audio file
+        output_device (int): Device index for output (optional, will be detected if None)
+    """
+    try:
+        # Detect USB headset if device not specified
+        if output_device is None:
+            _, output_device = detect_usb_headset()
+            if output_device is None:
+                print("Error: USB headset output device not found")
+                return False
+        
+        # Load audio file
+        from scipy.io import wavfile
+        sample_rate, audio_data = wavfile.read(audio_file)
+        
+        # Get audio duration
+        duration_s = len(audio_data) / sample_rate
+        print(f"Audio duration: {duration_s:.1f} seconds")
+        
+        # Play audio directly (should already be at 48kHz from TTS generation)
+        print("Playing audio on USB headset...")
+        sd.play(audio_data, samplerate=sample_rate, device=output_device)
+        sd.wait()  # Wait until playback is finished
+        print("Playback completed!")
+        return True
+        
+    except Exception as e:
+        print(f"Error playing audio on USB headset: {e}")
+        return False
+
 def play_audio(audio_file, audio_client=None):
     """
-    Play audio file on the robot speaker
+    Play audio file on the robot speaker or USB headset based on configuration
     
     Args:
         audio_file (str): Path to the audio file
         audio_client: AudioHubClient instance (optional, will be created if None)
     """
+    # Import config here to avoid circular dependency
+    from config import config
+    
+    # Route to appropriate output device
+    if config.AUDIO_OUTPUT_DEVICE == "usb_headset":
+        return play_audio_usb(audio_file)
+    
+    # Otherwise use robot speaker (original implementation)
     # Get the global client if not provided
     if audio_client is None:
         _, _, audio_client = initialize_sdk()
@@ -359,37 +472,61 @@ def play_audio(audio_file, audio_client=None):
         audio_client.MegaphoneExit()
 
 def play_cue_sound(audio_client, cue_filename):
-    """Plays the specified cue sound file without verbose output."""
+    """Plays the specified cue sound file on USB headset or robot speaker."""
+    # Import config here to avoid circular dependency
+    from config import config
+    
     script_dir = os.path.dirname(os.path.abspath(__file__))
     cue_path = os.path.join(script_dir, "..", "audio", cue_filename)
     
     if not os.path.exists(cue_path):
         print(f"Warning: Cue file not found at {cue_path}")
         return
-        
-    try:
-        # Enable Megaphone
-        audio_client.MegaphoneEnter()
-        
-        # Upload and play audio
-        print(f"Playing cue: {cue_filename}") # Add a small indication
-        audio_client.MegaphoneUpload(cue_path)
-        
-        # Wait a short fixed duration for the cue to play
-        time.sleep(0.5) # Adjust if the cues are longer
-        
-    except Exception as e:
-        print(f"Error playing cue sound ({cue_filename}): {e}")
-    finally:
-        # Ensure Megaphone is disabled
+    
+    print(f"Playing cue: {cue_filename}")
+    
+    # Route to appropriate output device
+    if config.AUDIO_OUTPUT_DEVICE == "usb_headset":
         try:
-            audio_client.MegaphoneExit()
+            _, output_device = detect_usb_headset()
+            if output_device is None:
+                print("Error: USB headset output device not found for cue sound")
+                return
+            
+            # Load cue sound (should already be at 48kHz)
+            from scipy.io import wavfile
+            sample_rate, audio_data = wavfile.read(cue_path)
+            
+            # Play cue sound directly
+            sd.play(audio_data, samplerate=sample_rate, device=output_device)
+            sd.wait()
         except Exception as e:
-            print(f"Error exiting megaphone mode during cue playback: {e}")
+            print(f"Error playing cue sound on USB headset ({cue_filename}): {e}")
+    else:
+        # Use robot speaker (original implementation)
+        try:
+            # Enable Megaphone
+            audio_client.MegaphoneEnter()
+            
+            # Upload and play audio
+            audio_client.MegaphoneUpload(cue_path)
+            
+            # Wait a short fixed duration for the cue to play
+            time.sleep(0.5) # Adjust if the cues are longer
+            
+        except Exception as e:
+            print(f"Error playing cue sound ({cue_filename}): {e}")
+        finally:
+            # Ensure Megaphone is disabled
+            try:
+                audio_client.MegaphoneExit()
+            except Exception as e:
+                print(f"Error exiting megaphone mode during cue playback: {e}")
 
 def robot_speak(text, model_name="en_US-amy-medium.onnx"):
     """
-    Convert text to speech and play it on the robot's speaker
+    Convert text to speech and play it on the configured audio output device
+    (USB headset or robot speaker based on AUDIO_OUTPUT_DEVICE config)
     
     Args:
         text (str): The text to convert to speech and play
@@ -436,7 +573,7 @@ def detect_clickers():
         return []
 # --------------------------------------------------------------------
 
-def record_audio(devices, output_path="tmp/recorded_audio.wav", sample_rate=44100, trigger_key="KEY_TAB", clear_key="KEY_PAGEDOWN"):
+def record_audio(devices, output_path="tmp/recorded_audio.wav", sample_rate=None, trigger_key="KEY_VOLUMEUP", clear_key="KEY_PAGEDOWN", input_device=None):
     """
     Records audio when a specific key is pressed on given devices, stops on second press.
     Also listens for a clear key to signal chat clearing.
@@ -444,19 +581,39 @@ def record_audio(devices, output_path="tmp/recorded_audio.wav", sample_rate=4410
     Args:
         devices (list): List of evdev.InputDevice objects to listen to.
         output_path (str): Path to save the recorded audio.
-        sample_rate (int): Sample rate for the recording.
-        trigger_key (str): The keycode string (e.g., 'KEY_TAB') to trigger recording.
+        sample_rate (int): Sample rate for the recording (optional, will use device's native rate if None).
+        trigger_key (str): The keycode string (e.g., 'KEY_VOLUMEUP') to trigger recording.
         clear_key (str): The keycode string (e.g., 'KEY_PAGEDOWN') to signal chat clear.
+        input_device (int): Audio input device index for sounddevice (optional, will be detected if None)
 
     Returns:
         str: Path to the recorded audio file, "CLEAR_CHAT" if clear key was pressed,
              or None if recording failed or was cancelled.
     """
-    # Ensure SDK is initialized and get the audio client
+    # Import config here to avoid circular dependency
+    from config import config
+    
+    # Ensure SDK is initialized and get the audio client (for robot speaker cues if configured)
     _, _, audio_client = initialize_sdk()
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
+    # Detect USB headset for audio input if needed
+    if input_device is None and config.AUDIO_INPUT_DEVICE == "usb_headset":
+        input_device, _ = detect_usb_headset()
+        if input_device is None:
+            print("Error: USB headset input device not found")
+            return None
+    
+    # Use device's native sample rate if not specified
+    if sample_rate is None:
+        if input_device is not None:
+            device_info = sd.query_devices(input_device)
+            sample_rate = int(device_info['default_samplerate'])
+            print(f"[Audio] Using device sample rate: {sample_rate}Hz")
+        else:
+            sample_rate = 44100  # Fallback default
 
-    print(f"Press '{trigger_key}' on the clicker to start/stop recording, or '{clear_key}' to clear chat history...")
+    print(f"Press '{trigger_key}' on the USB headset to start/stop recording, or '{clear_key}' to clear chat history...")
 
     audio_data = []
     recording = False
@@ -486,7 +643,11 @@ def record_audio(devices, output_path="tmp/recorded_audio.wav", sample_rate=4410
                                                 print(f"Recording status error: {status}")
                                             audio_data.append(indata.copy())
                                         
-                                        stream = sd.InputStream(callback=callback, channels=1, samplerate=sample_rate)
+                                        # Create input stream with device specification
+                                        stream_kwargs = {'callback': callback, 'channels': 1, 'samplerate': sample_rate}
+                                        if input_device is not None:
+                                            stream_kwargs['device'] = input_device
+                                        stream = sd.InputStream(**stream_kwargs)
                                         stream.start()
                                         recording = True
                                     else:
@@ -561,32 +722,35 @@ def transcribe_audio(audio_path, model_name=ASR_MODEL):
     result = model.transcribe(audio_path, fp16=False)
     return result["text"]
 
-def robot_listen(output_path="tmp/recorded_audio.wav", sample_rate=44100, model_name=ASR_MODEL, trigger_key="KEY_TAB", clear_key="KEY_PAGEDOWN"):
+def robot_listen(output_path="tmp/recorded_audio.wav", sample_rate=None, model_name=ASR_MODEL, trigger_key="KEY_VOLUMEUP", clear_key="KEY_PAGEDOWN"):
     """
-    Detects clicker, records audio when the trigger key is pressed, stops recording
+    Detects USB headset, records audio when the trigger key is pressed, stops recording
     on second press, transcribes the audio, OR detects the clear key press.
 
     Args:
         output_path (str): Path to save the recorded audio.
         sample_rate (int): Sample rate for the recording.
         model_name (str): Whisper model to use.
-        trigger_key (str): The keycode string to trigger recording (e.g., 'KEY_TAB').
+        trigger_key (str): The keycode string to trigger recording (e.g., 'KEY_VOLUMEUP').
         clear_key (str): The keycode string to trigger chat clear (e.g., 'KEY_PAGEDOWN').
 
     Returns:
         str: Transcribed text from the recorded audio, "CLEAR_CHAT" if clear key was pressed,
              or None if recording failed/cancelled.
     """
-    print("Detecting clicker devices...")
-    clicker_devices = detect_clickers()
+    # Import config here to avoid circular dependency
+    from config import config
     
-    if not clicker_devices:
-        print("Error: No matching clicker devices found. Cannot start listening.")
-        print("Please ensure a supported clicker is connected and you have permissions.")
+    print("Detecting USB headset input devices...")
+    headset_devices = detect_usb_headset_input()
+    
+    if not headset_devices:
+        print("Error: No matching USB headset devices found. Cannot start listening.")
+        print("Please ensure a Logitech USB headset is connected and you have permissions.")
         return None
         
-    print("Found clicker devices:")
-    for device in clicker_devices:
+    print("Found USB headset input devices:")
+    for device in headset_devices:
         # Grab exclusive access to the devices to prevent others (like the OS) from using them
         try:
             device.grab() 
@@ -596,7 +760,7 @@ def robot_listen(output_path="tmp/recorded_audio.wav", sample_rate=44100, model_
             # Decide if we should continue without grab or fail? Let's try continuing.
 
     try:
-        record_result = record_audio(clicker_devices, output_path, sample_rate, trigger_key, clear_key)
+        record_result = record_audio(headset_devices, output_path, sample_rate, trigger_key, clear_key)
 
         if record_result == "CLEAR_CHAT":
             return "CLEAR_CHAT" # Pass the signal up
@@ -611,8 +775,8 @@ def robot_listen(output_path="tmp/recorded_audio.wav", sample_rate=44100, model_
             
     finally:
         # Release and close the devices to avoid noisy __del__ errors on Ctrl+C
-        print("Releasing clicker devices...")
-        for device in clicker_devices:
+        print("Releasing USB headset input devices...")
+        for device in headset_devices:
             try:
                 try:
                     device.ungrab()

@@ -8,8 +8,9 @@ LISA (Local Intelligent Safety Assistant) is an LLM-powered assistant that runs 
 - 📸 **Camera Control**: Take pictures and analyze visual data
 - 🔍 **Vision Analysis**: Use vision models to understand and describe scenes
 - 🦺 **Safety Monitoring**: Detect PPE violations (hard hat detection) and execute safety protocols
-- 🎤 **Voice Interaction**: Support for both keyboard and clicker-based voice input
+- 🎤 **Voice Interaction**: Support for keyboard and USB headset voice input (with volume button trigger)
 - 🔊 **Text-to-Speech**: Natural voice responses using Piper TTS
+- 🎧 **USB Headset Support**: Full audio I/O via USB headset (Logitech) with configurable robot speaker fallback
 - 🌐 **Flexible Deployment**: Run with local Ollama or remote API backends
 
 ## System Architecture
@@ -244,6 +245,8 @@ python scripts/lisa_api_kb.py
 | `TTS_MODEL_NAME` | TTS model file | `en_US-amy-medium.onnx` |
 | `ASR_MODEL` | Whisper ASR model | `tiny.en` |
 | `ENABLE_SPEECH` | Enable speech output | `true` |
+| `AUDIO_OUTPUT_DEVICE` | Audio output device | `usb_headset` / `robot_speaker` |
+| `AUDIO_INPUT_DEVICE` | Audio input device | `usb_headset` / `default` |
 
 **📖 See [CONFIG.md](CONFIG.md) for complete configuration documentation**
 
