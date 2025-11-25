@@ -16,10 +16,14 @@ New environment variables added:
 
 **Supported USB Headsets:**
 - Logitech USB headsets (Vendor ID: 046d)
-- Logitech G435 Wireless Gaming Headset
-- Logitech G733 Gaming Headset
-- Other Logitech gaming headsets with USB audio
-- Auto-detected by device name patterns: logitech, 046d, g435, g733, gaming headset
+  - Logitech G435 Wireless Gaming Headset
+  - Logitech G733 Gaming Headset
+  - Other Logitech gaming headsets
+- Jieli Technology headsets
+  - Jieli L80PRO
+  - Other Jieli USB audio devices
+- Most USB gaming headsets with USB audio
+- Auto-detected by device name patterns: logitech, 046d, g435, g733, jieli, l80pro, gaming headset, usb audio
 
 **Input Trigger:**
 - Changed from wireless clicker TAB key to USB headset **Volume Up button**

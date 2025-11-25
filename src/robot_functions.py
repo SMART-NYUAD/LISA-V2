@@ -85,9 +85,9 @@ def detect_usb_headset():
         
         for idx, device in enumerate(devices):
             device_name = device['name'].lower()
-            # Look for Logitech devices or specific gaming headset models
-            # Patterns: logitech, 046d (vendor ID), g435, g733, gaming headset with USB audio
-            if any(pattern in device_name for pattern in ['logitech', '046d', 'g435', 'g733', 'gaming headset']):
+            # Look for USB headsets - Logitech, Jieli, and other gaming/USB headsets
+            # Patterns: logitech, 046d (Logitech vendor ID), g435, g733, jieli, l80pro, gaming headset
+            if any(pattern in device_name for pattern in ['logitech', '046d', 'g435', 'g733', 'jieli', 'l80pro', 'gaming headset', 'usb audio']):
                 # Check if device supports input (recording)
                 if device['max_input_channels'] > 0:
                     input_device = idx
@@ -114,8 +114,8 @@ def detect_usb_headset_input():
         selected_devices = []
         for device in devices:
             device_name = device.name.lower()
-            # Look for Logitech devices
-            if 'logitech' in device_name or '046d' in device_name:
+            # Look for USB headsets (Logitech, Jieli, etc.)
+            if any(pattern in device_name for pattern in ['logitech', '046d', 'jieli', 'l80pro', 'usb']):
                 selected_devices.append(device)
                 print(f"[Input] Found USB headset input device: {device.name}")
         return selected_devices
@@ -482,7 +482,7 @@ def play_cue_sound(audio_client, cue_filename):
     if not os.path.exists(cue_path):
         print(f"Warning: Cue file not found at {cue_path}")
         return
-    
+        
     print(f"Playing cue: {cue_filename}")
     
     # Route to appropriate output device
@@ -596,7 +596,7 @@ def record_audio(devices, output_path="tmp/recorded_audio.wav", sample_rate=None
     # Ensure SDK is initialized and get the audio client (for robot speaker cues if configured)
     _, _, audio_client = initialize_sdk()
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    
+
     # Detect USB headset for audio input if needed
     if input_device is None and config.AUDIO_INPUT_DEVICE == "usb_headset":
         input_device, _ = detect_usb_headset()
