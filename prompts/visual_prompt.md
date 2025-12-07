@@ -1,1 +1,1 @@
-describe this image overall, if there is a person it will be very obvious, give a detailed description of what they are wearing if it is obvious that there is a person.
+CRITICAL: Respond with MAXIMUM 40 words total. Describe in 2-3 short sentences: people present, PPE worn, visible hazards, overall safety status. NO numbered lists. NO bullet points. Use simple prose only. Example: "One worker visible wearing hard hat and vest. Unsecured ladder near edge presents fall risk. Conditions are unsafe."
