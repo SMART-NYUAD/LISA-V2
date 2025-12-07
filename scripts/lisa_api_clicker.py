@@ -19,7 +19,7 @@ Usage:
 
 Controls:
     TAB key: Start/stop audio recording
-    PAGEDOWN key: Clear conversation history
+    VOLUMEDOWN key: Clear conversation history
     Ctrl+C: Exit program
 
 Environment Variables:
@@ -200,7 +200,24 @@ def execute_function(function_call, chat_model, vision_model, messages, logger):
             if success:
                 success_msg = "Picture taken successfully"
                 print(success_msg)
-                return success_msg
+                
+                # Automatically trigger image analysis for demo flow
+                print("Auto-triggering image analysis...")
+                
+                # We need to construct a "fake" analysis function call to pass to ourselves recursively
+                # This simulates the LLM deciding to analyze the image immediately
+                analysis_call = {
+                    "function": "analyze_image",
+                    "params": {"prompt": "Describe what you see with attention to safety"},
+                    "speak": "Analyzing the image now."
+                }
+                
+                # Recursively call execute_function for the analysis
+                analysis_result = execute_function(analysis_call, chat_model, vision_model, messages, logger)
+                
+                # Signal that we are done with this chain and want to wait for user input
+                return "WAIT_FOR_USER_INPUT"
+                
             else:
                 error_msg = "Failed to take picture"
                 print(error_msg)
@@ -243,8 +260,12 @@ def execute_function(function_call, chat_model, vision_model, messages, logger):
             analysis_result = response['message']['content'].strip()
             print(f"Analysis result: {analysis_result}")
             
+            # Directly speak the analysis result instead of returning it to the conversation
+            if ENABLE_SPEECH:
+                robot_speak(analysis_result)
             
-            return f"Image analysis: {analysis_result}"
+            # Return a summary so the LLM knows it's done, but doesn't need to re-speak it
+            return f"Image analysis completed and spoken to user: {analysis_result[:50]}..."
             
         elif function_name == "speak":
             message = params.get("message")
@@ -343,7 +364,10 @@ def main():
     # Main conversation loop via ASR/clicker
     while not _shutdown_requested:
         try:
-            user_input = robot_listen()
+            user_input = robot_listen(
+                check_stop_func=lambda: _shutdown_requested,
+                clear_key="KEY_VOLUMEDOWN"
+            )
             
             # Handle case where listening failed or was cancelled
             if user_input is None:
@@ -408,6 +432,14 @@ def main():
                 print(f"DEBUG: Executing function: {function_call}")
                 result = execute_function(function_call, chat_model, vision_model, messages, None)
                 
+                # Check for special break signals immediately
+                if result == "WAIT_FOR_USER_INPUT":
+                    print("Workflow completed, waiting for user input...")
+                    # We still append the result to history so the LLM knows what happened
+                    messages.append({"role": "assistant", "content": assistant_response})
+                    messages.append({"role": "user", "content": "Function execution completed successfully."})
+                    continue
+
                 # Add assistant response and function result to messages
                 messages.append({"role": "assistant", "content": assistant_response})
                 messages.append({"role": "user", "content": f"Function result: {result}"})

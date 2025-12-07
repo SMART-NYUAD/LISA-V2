@@ -573,7 +573,7 @@ def detect_clickers():
         return []
 # --------------------------------------------------------------------
 
-def record_audio(devices, output_path="tmp/recorded_audio.wav", sample_rate=None, trigger_key="KEY_VOLUMEUP", clear_key="KEY_PAGEDOWN", input_device=None):
+def record_audio(devices, output_path="tmp/recorded_audio.wav", sample_rate=None, trigger_key="KEY_VOLUMEUP", clear_key="KEY_PAGEDOWN", input_device=None, check_stop_func=None):
     """
     Records audio when a specific key is pressed on given devices, stops on second press.
     Also listens for a clear key to signal chat clearing.
@@ -585,6 +585,7 @@ def record_audio(devices, output_path="tmp/recorded_audio.wav", sample_rate=None
         trigger_key (str): The keycode string (e.g., 'KEY_VOLUMEUP') to trigger recording.
         clear_key (str): The keycode string (e.g., 'KEY_PAGEDOWN') to signal chat clear.
         input_device (int): Audio input device index for sounddevice (optional, will be detected if None)
+        check_stop_func (callable): Optional function that returns True if recording should be aborted.
 
     Returns:
         str: Path to the recorded audio file, "CLEAR_CHAT" if clear key was pressed,
@@ -621,6 +622,14 @@ def record_audio(devices, output_path="tmp/recorded_audio.wav", sample_rate=None
 
     try:
         while True:
+            # Check for external stop signal
+            if check_stop_func and check_stop_func():
+                print("Recording aborted by stop signal.")
+                if stream and recording:
+                    stream.stop()
+                    stream.close()
+                return None
+
             r, _, _ = select(devices, [], [], 0.1) # Timeout avoids busy-waiting
             for device in r:
                 try:
@@ -700,6 +709,9 @@ def record_audio(devices, output_path="tmp/recorded_audio.wav", sample_rate=None
             stream.stop()
             stream.close()
         return None # Indicate interruption
+    except Exception as e:
+        print(f"Unexpected error in recording loop: {e}")
+        return None
     finally:
         # Ensure stream is closed if loop exits unexpectedly
         if stream and not stream.closed:
@@ -722,7 +734,7 @@ def transcribe_audio(audio_path, model_name=ASR_MODEL):
     result = model.transcribe(audio_path, fp16=False)
     return result["text"]
 
-def robot_listen(output_path="tmp/recorded_audio.wav", sample_rate=None, model_name=ASR_MODEL, trigger_key="KEY_VOLUMEUP", clear_key="KEY_PAGEDOWN"):
+def robot_listen(output_path="tmp/recorded_audio.wav", sample_rate=None, model_name=ASR_MODEL, trigger_key="KEY_VOLUMEUP", clear_key="KEY_PAGEDOWN", check_stop_func=None):
     """
     Detects USB headset, records audio when the trigger key is pressed, stops recording
     on second press, transcribes the audio, OR detects the clear key press.
@@ -733,6 +745,7 @@ def robot_listen(output_path="tmp/recorded_audio.wav", sample_rate=None, model_n
         model_name (str): Whisper model to use.
         trigger_key (str): The keycode string to trigger recording (e.g., 'KEY_VOLUMEUP').
         clear_key (str): The keycode string to trigger chat clear (e.g., 'KEY_PAGEDOWN').
+        check_stop_func (callable): Optional function that returns True if listening should be aborted.
 
     Returns:
         str: Transcribed text from the recorded audio, "CLEAR_CHAT" if clear key was pressed,
@@ -758,9 +771,24 @@ def robot_listen(output_path="tmp/recorded_audio.wav", sample_rate=None, model_n
         except IOError as e:
             print(f" - {device.name} (Failed to grab: {e}. Events might be captured elsewhere.)")
             # Decide if we should continue without grab or fail? Let's try continuing.
+            
+    # Check stop signal before starting
+    if check_stop_func and check_stop_func():
+        print("Listening cancelled before start.")
+        # Release grabbed devices before returning
+        for device in headset_devices:
+            try:
+                device.ungrab()
+            except:
+                pass
+            try:
+                device.close()
+            except:
+                pass
+        return None
 
     try:
-        record_result = record_audio(headset_devices, output_path, sample_rate, trigger_key, clear_key)
+        record_result = record_audio(headset_devices, output_path, sample_rate, trigger_key, clear_key, check_stop_func=check_stop_func)
 
         if record_result == "CLEAR_CHAT":
             return "CLEAR_CHAT" # Pass the signal up
