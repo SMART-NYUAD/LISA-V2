@@ -1,0 +1,4 @@
+($laptop)ros2 launch go2_rviz rviz.launch.py
+($laptop)ros2 launch nav2_bringup navigation_smart_launch.py
+($robot) ros2 launch go2_bringup go2_smart.launch.py lidar_livox:=True rf2o_odometry:=True goal_stamp_refresher:=True
+($laptop)ros2 launch nav2_bringup localization_go2w_launch.py map:=maps/archive/smart_lab.yaml
