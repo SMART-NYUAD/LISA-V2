@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
 """
-LISA - AI-Powered Robot Navigation & Safety Assistant (API + Clicker/ASR Mode)
+LISA - AI-Powered PPE Compliance Robot (API + Clicker/ASR Mode)
 
 This script runs LISA with a remote Ollama API backend and hands-free voice input
-via wireless presenter clicker and Whisper ASR. Designed for production deployment.
+via wireless presenter clicker and Whisper ASR. Focused on PPE detection demo.
 
 Key Features:
 - Remote Ollama API for LLM inference
 - Clicker-triggered voice input (hands-free)
 - Automatic speech recognition (Whisper)
-- Robot navigation via ROS 2
 - Camera control and vision analysis
-- Safety monitoring with PPE detection
-- Text-to-speech announcements with audio cues
+- PPE compliance detection for construction activities
+- Text-to-speech announcements
 
 Usage:
     python lisa_api_clicker.py
@@ -22,17 +21,11 @@ Controls:
     VOLUMEDOWN key: Clear conversation history
     Ctrl+C: Exit program
 
-Environment Variables:
-    LISA_CHAT_MODEL: Chat model name (default: gemma3:27b)
-    LISA_VISION_MODEL: Vision model name (default: gemma3:27b)
-    UNITREE_SDK_PATH: Path to Unitree SDK (default: /home/unitree/unitree_sdk2_python)
-
 Supported Clicker Devices:
     - Wireless Present Wireless Present Keyboard
     - KNORVAY Knorvay Wireless Presenter Keyboard
 
-Author: [Your team/organization]
-Version: 2.0
+Version: 2.1 (PPE Demo)
 """
 import sys
 import time
@@ -49,11 +42,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from config import config
 from robot_functions import robot_take_pic, robot_speak, robot_listen, preload_tts_model
-from ros_functions import (
-    navigate_to, 
-    start_status_listener, 
-    wait_for_goal_completion
-)
+# Navigation imports removed - not needed for PPE demo
+# from ros_functions import navigate_to, start_status_listener, wait_for_goal_completion
 
 
 # Enable speech (from config)
@@ -175,25 +165,7 @@ def execute_function(function_call, chat_model, vision_model, messages, logger):
     start_time = time.time()
     
     try:
-        if function_name == "navigate_to":
-            location = params.get("location")
-            if not location:
-                return "Error: No location specified for navigation"
-            
-            print(f"Navigating to {location}...")
-            goal_id = navigate_to(location)
-            result = wait_for_goal_completion(goal_id, timeout=120.0)
-            
-            if result == "SUCCEEDED":
-                success_msg = f"Successfully reached {location}"
-                print(success_msg)
-                return success_msg
-            else:
-                error_msg = f"Navigation to {location} failed: {result}"
-                print(error_msg)
-                return error_msg
-                
-        elif function_name == "take_picture":
+        if function_name == "take_picture":
             print("Taking a picture...")
             success = robot_take_pic()
             
@@ -279,9 +251,6 @@ def execute_function(function_call, chat_model, vision_model, messages, logger):
             
             return f"Announced: {message}"
             
-        elif function_name == "activate_safety_protocol":
-            return load_safety_protocol(messages)
-            
         elif function_name == "wait_for_response":
             # Signal that we're waiting for human input - don't continue workflow
             message = params.get("message", "Waiting for response...")
@@ -295,31 +264,6 @@ def execute_function(function_call, chat_model, vision_model, messages, logger):
         print(error_msg)
         return error_msg
 
-
-def load_safety_protocol(messages):
-    """Load the safety protocol into the conversation."""
-    print("🚨 Safety violation detected - loading safety compliance protocol")
-    
-    # Load safety prompt
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    safety_prompt_path = os.path.join(script_dir, "..", "prompts", "side_prompt.md")
-    
-    if os.path.exists(safety_prompt_path):
-        safety_prompt = load_prompt(safety_prompt_path)
-        # Add safety prompt as system message
-        messages.append({
-            "role": "system", 
-            "content": f"SAFETY PROTOCOL ACTIVATED:\n\n{safety_prompt}"
-        })
-        messages.append({
-            "role": "user",
-            "content": "Safety protocol has been loaded. You must now begin STEP 1 of the safety workflow: Confirm the safety violation with the worker, ask for their name and ask if they want you to fetch a hard hat."
-        })
-        print("🔒 Safety compliance protocol loaded")
-        return "Safety protocol loaded and activated - beginning safety workflow"
-    else:
-        print("⚠️ Safety prompt file not found")
-        return "Error: Safety prompt file not found"
 
 _shutdown_requested = False
 
@@ -336,14 +280,13 @@ def main():
     # Tee terminal output to file
     setup_terminal_log("../logs/api")
     
-    # Initialize status listener
-    start_status_listener()
+    # Navigation status listener removed - not needed for PPE demo
     
     # Initialize message history
     messages = []
     
     # Welcome message
-    print("\n=== LISA - Navigation & Camera Assistant (Demo V2, API) ===")
+    print("\n=== LISA - PPE Compliance Assistant (Demo V2.1, API) ===")
     print(f"Using Ollama chat model: {chat_model}")
     print(f"Using Ollama vision model: {vision_model}")
     print(f"API endpoint: {OLLAMA_API_BASE}")
@@ -353,10 +296,10 @@ def main():
     # Preload TTS model to eliminate first-call latency
     preload_tts_model()
     
-    welcome_message = "Hello! I'm LISA, your navigation and camera assistant. I can go to different locations, take pictures, and analyze what I see. How can I help you today?"
+    welcome_message = "Hello! I'm LISA, your PPE compliance assistant. I can take pictures and check if workers are wearing the right safety equipment for their tasks. How can I help you today?"
     print(f"LISA: {welcome_message}")
-    if ENABLE_SPEECH:
-        robot_speak(welcome_message)
+    #if ENABLE_SPEECH:
+        #robot_speak(welcome_message)
     
     # Install graceful Ctrl+C handler
     signal.signal(signal.SIGINT, _handle_sigint)
